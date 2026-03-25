@@ -2363,6 +2363,37 @@ def test_experimental_markdown_syntax_text_splitter_header_config_on_multi_files
     assert output == expected_output
 
 
+def test_experimental_markdown_syntax_text_splitter_unclosed_code_block() -> None:
+    """Test that unclosed code blocks preserve content instead of discarding it."""
+    markdown_splitter = ExperimentalMarkdownSyntaxTextSplitter()
+
+    # Unclosed code block at end of document
+    text = "# Header\nSome text\n```python\nprint('hello')\nmore code\n"
+    output = markdown_splitter.split_text(text)
+    code_docs = [doc for doc in output if "Code" in doc.metadata]
+    assert len(code_docs) == 1
+    assert code_docs[0].metadata["Code"] == "python"
+    assert "print('hello')" in code_docs[0].page_content
+    assert "more code" in code_docs[0].page_content
+
+    # Document that is only an unclosed code block
+    text2 = "```js\nconsole.log('test')\n"
+    output2 = markdown_splitter.split_text(text2)
+    assert len(output2) == 1
+    assert "console.log('test')" in output2[0].page_content
+    assert output2[0].metadata["Code"] == "js"
+
+    # Unclosed code block after regular text
+    text3 = "# Title\nSome intro text\n```\ncode here\n"
+    output3 = markdown_splitter.split_text(text3)
+    text_docs = [doc for doc in output3 if "Code" not in doc.metadata]
+    code_docs3 = [doc for doc in output3 if "Code" in doc.metadata]
+    assert len(text_docs) == 1
+    assert "Some intro text" in text_docs[0].page_content
+    assert len(code_docs3) == 1
+    assert "code here" in code_docs3[0].page_content
+
+
 def test_solidity_code_splitter() -> None:
     splitter = RecursiveCharacterTextSplitter.from_language(
         Language.SOL, chunk_size=CHUNK_SIZE, chunk_overlap=0
